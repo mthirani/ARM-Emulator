@@ -2,12 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/times.h>
+#include <time.h>
 
 /* ARM Assembly Functions to emulate */
 int fact_recursive(int);
 int fact_iterative(int);
-int isort(int);
-int rsum(int);
+int isort(int, int);
+int rsum(int, int, int, int);
 
 /* ARM Machine State */
 #define ARM_STACK_SIZE 16384
@@ -470,21 +472,24 @@ void instructionAnalysis(struct arm_state *state, char *str)
 /* Main */
 int main(int argc, char **argv)
 {
+    clock_t ct1, ct2;
     unsigned rv;
     int factNumber;
     int *insSortArray;
     int lengthArray;
     int i;
-    unsigned *insSort[2];
+    unsigned insSort[2];
     struct arm_state state;
     int *rsumArray;
     int index = 0;
     int sum = 0;
     unsigned recurSum[4];
     int totalRegCounts;
-
+    
     /* Recursive Sum: Recursively Compute the numbers of an array */
-    printf("/**************** Result and Dynamic Analysis for \"Recursive Sum\" ***************/\n\n");
+    printf("\n/**************** Result and Dynamic Analysis for \"Recursive Sum\" ***************/\n\n");
+    printf("[Input/ Output @ %s] :::\n", "Recursive Sum");
+    printf("<-------------- Input -------------->\n");
     while(true){
         printf("Enter the length of Array: ");
         scanf("%d", &lengthArray);
@@ -505,20 +510,35 @@ int main(int argc, char **argv)
         for(i=0; i<lengthArray; i++) {
                 rsumArray[i] = (rand() % 50) + 1;
         }
+	printf("As the length of array is > 10 so Input array generated dynamically for you.\n");
     }
     recurSum[0] = sum;
     recurSum[1] = lengthArray;
     recurSum[2] = index;
-    recurSum[3] = (unsigned )&rsumArray[0];
+    recurSum[3] = (unsigned) &rsumArray[0];
+    ct1 = clock();
     rv = emu(&state, (void *) rsum, 4, (unsigned *) recurSum);
+    ct2 = clock();
+    printf("<-------------- Output -------------->\n");
     printf("sum = %d\n\n", rv);
     totalRegCounts = registersUsage(&state);
     regReadAnalysis(&state, totalRegCounts, "Recursive Sum");
     regWriteAnalysis(&state, totalRegCounts, "Recursive Sum");
-    instructionAnalysis(&state, "Recursive Sum");   
-    
-     /* Factorial Recursive: Input Number and Passing it to emu function for executing ARM instructions */
+    instructionAnalysis(&state, "Recursive Sum");
+    printf("[Performance Analysis @ %s] :::\n", "Recursive Sum");
+    printf("<-------------- ARM Emulator -------------->\n");
+    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+    ct1 = clock();
+    rv = rsum(recurSum[0], recurSum[1], recurSum[2], recurSum[3]);
+    ct2 = clock();
+    printf("<---------- Native Assembly Code ---------->\n");
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+
+    /* Factorial Recursive: Input Number and Passing it to emu function for executing ARM instructions */
     printf("/**************** Result and Dynamic Analysis for \"Factorial Recursive\" ***************/\n\n");
+    printf("[Input/ Output @ %s] :::\n", "Factorial Recursive");
+    printf("<---------------- Input ---------------->\n");
     while(true){
         printf("Enter the number to get the factorial: ");
         scanf("%d", &factNumber);
@@ -527,15 +547,29 @@ int main(int argc, char **argv)
         else
                 break;
     }
+    ct1 = clock();
     rv = emu(&state, (void *) fact_recursive, 1, &factNumber);
+    ct2 = clock();
+    printf("<---------------- Output ---------------->\n");
     printf("fact_recursive(%d) = %d\n\n", factNumber, rv);
     totalRegCounts = registersUsage(&state);
     regReadAnalysis(&state, totalRegCounts, "Factorial Recursive Way");
     regWriteAnalysis(&state, totalRegCounts, "Factorial Recursive Way");
     instructionAnalysis(&state, "Factorial Recursive Way");
-
+    printf("[Performance Analysis @ %s] :::\n", "Factorial Recursive Way");
+    printf("<------------------ ARM Emulator ------------------>\n");
+    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+    ct1 = clock();
+    rv = fact_recursive(factNumber);
+    ct2 = clock();
+    printf("<-------------- Native Assembly Code -------------->\n");
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+    
     /* Factorial Iterative: Input Number and Passing it to emu function for executing ARM instructions */
     printf("/**************** Result and Dynamic Analysis for \"Factorial Iterative\" ***************/\n\n");
+    printf("[Input/ Output @ %s] :::\n", "Factorial Iterative");
+    printf("<---------------- Input ---------------->\n");
     while(true){
     	printf("Enter the number to get the factorial: ");
     	scanf("%d", &factNumber);
@@ -544,15 +578,29 @@ int main(int argc, char **argv)
 	else
 		break;
     }
+    ct1 = clock();
     rv = emu(&state, (void *) fact_iterative, 1, &factNumber);
+    ct2 = clock();
+    printf("<---------------- Output ---------------->\n");
     printf("fact_iterative(%d) = %d\n\n", factNumber, rv);
     totalRegCounts = registersUsage(&state);
     regReadAnalysis(&state, totalRegCounts, "Factorial Iterative Way");
     regWriteAnalysis(&state, totalRegCounts, "Factorial Iterative Way");
     instructionAnalysis(&state, "Factorial Iterative Way");   
-    
+    printf("[Performance Analysis @ %s] :::\n", "Factorial Iterative Way");
+    printf("<------------------ ARM Emulator ------------------>\n");
+    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+    ct1 = clock();
+    rv = fact_iterative(factNumber);
+    ct2 = clock();
+    printf("<-------------- Native Assembly Code -------------->\n");
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+
     /* InsertionSort: Input Numbers and Passing it to emu function for executing ARM instructions */
     printf("/**************** Result and Dynamic Analysis for \"Insertion Sort\" ***************/\n\n");
+    printf("[Input/ Output @ %s] :::\n", "Insertion Sort");
+    printf("<-------------- Input -------------->\n");
     while(true){
         printf("Enter the length of Array: ");
         scanf("%d", &lengthArray);
@@ -573,11 +621,15 @@ int main(int argc, char **argv)
 	for(i=0; i<lengthArray; i++) {
 		insSortArray[i] = (rand() % 100) + 1;
     	}
+	printf("As the length of array is > 10 so Input array generated dynamically for you.\n");
     }
-    insSort[0] = &lengthArray;
-    insSort[1] = &insSortArray[0];
+    insSort[0] = (unsigned) &lengthArray;
+    insSort[1] = (unsigned) &insSortArray[0];
+    ct1 = clock();
     rv = emu(&state, (void *) isort, 2, (unsigned *) insSort);
+    ct2 = clock();
     insSortArray = (int *)rv;
+    printf("<-------------- Output -------------->\n");
     printf("Below is the sorted Array.\n");
     for(i=0; i<lengthArray; i++) {
         printf("%d: %d\n", (i+1), insSortArray[i]);
@@ -587,7 +639,16 @@ int main(int argc, char **argv)
     regReadAnalysis(&state, totalRegCounts, "Insertion Sort");
     regWriteAnalysis(&state, totalRegCounts, "Insertion Sort");
     instructionAnalysis(&state, "Insertion Sort"); 
-    
+    printf("[Performance Analysis @ %s] :::\n", "Insertion Sort");
+    printf("<-------------- ARM Emulator -------------->\n");
+    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+    ct1 = clock();
+    rv = isort(insSort[0], insSort[1]);
+    ct2 = clock();
+    printf("<---------- Native Assembly Code ---------->\n");
+    printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
+
     return 0;
 }
 
