@@ -6,8 +6,8 @@
 /* ARM Assembly Functions to emulate */
 int fact_recursive(int);
 int fact_iterative(int);
-int isort(int *);
-int rsum(int *);
+int isort(int);
+int rsum(int);
 
 /* ARM Machine State */
 #define ARM_STACK_SIZE 16384
@@ -16,6 +16,13 @@ struct arm_state {
     unsigned regs[16];
     unsigned cpsr;
     unsigned char stack[ARM_STACK_SIZE];
+    unsigned regReads[16];
+    unsigned regWrites[16];
+    unsigned cpsrReads;
+    unsigned cpsrWrites;
+    unsigned memoryInstr;
+    unsigned computeInstr;
+    unsigned branchInstr;
 };
 
 /* Initialize the arm_state struct */
@@ -24,8 +31,15 @@ void arm_state_init(struct arm_state *state)
     int i;
     for (i = 0; i < 16; i++) {
 	state->regs[i] = 0;
+	state->regReads[i] = 0;
+	state->regWrites[i] = 0;
     }
     state->cpsr = 0;
+    state->cpsrReads = 0;
+    state->cpsrWrites = 0;
+    state->memoryInstr = 0;
+    state->computeInstr = 0;
+    state->branchInstr = 0;
     for (i = 0; i < ARM_STACK_SIZE; i++) {
 	state->stack[i] = 0;
     }
@@ -80,14 +94,17 @@ void execute_dp_iw(struct arm_state *state, unsigned iw)
     imm = iw & 0b11111111;
     immBit = (iw >> 25) & 0b1;
     setBit = (iw >> 20) & 0b1;
-    
-    if(immBit == 0) {
+    valueRmReg = imm;
+
+    if(immBit == 0) {			//Operand2 is a register
 	valueRmReg = state->regs[rm];
+	state->regReads[rm] = state->regReads[rm] + 1;
 	shiftCode = (iw >> 4) & 0b1;
 	shiftType = (iw >> 5) & 0b11;
 	if(shiftCode == 1) {
 		shiftAmount = (iw >> 8) & 0b1111;
 		shiftAmount = state->regs[shiftAmount];
+		state->regReads[shiftAmount] =  state->regReads[shiftAmount] + 1;
 	}
 	else {
 		shiftAmount = (iw >> 7) & 0b11111;	
@@ -98,34 +115,33 @@ void execute_dp_iw(struct arm_state *state, unsigned iw)
                  valueRmReg = valueRmReg / (shiftAmount * 2);
         }
     }
+
     if (opcode == 0b1101) {	//MOV Instruction
-	if(immBit == 1)
-		state->regs[rd] = imm;
-	else
-		state->regs[rd] = valueRmReg;
+	state->regs[rd] = valueRmReg;
+	state->regWrites[rd] = state->regWrites[rd] + 1;
     } else if (opcode == 0b0100) {	//ADD Instruction
-	if(immBit == 1)
-		state->regs[rd] = state->regs[rn] + imm;
-	else
-		state->regs[rd] = state->regs[rn] + valueRmReg;
+	state->regs[rd] = state->regs[rn] + valueRmReg;
+	state->regReads[rn] = state->regReads[rn] + 1;
+	state->regWrites[rd] = state->regWrites[rd] + 1;
     } else if (opcode == 0b0010) {      //SUB Instruction
-        if(immBit == 1)
-                state->regs[rd] = state->regs[rn] - imm;
-        else
-                state->regs[rd] = state->regs[rn] - valueRmReg;
+        state->regs[rd] = state->regs[rn] - valueRmReg;
+	state->regReads[rn] = state->regReads[rn] + 1;
+	state->regWrites[rd] = state->regWrites[rd] + 1;
     } else if (opcode == 0b1010) {	//CMP Instruction
-	if(immBit == 1)
-                compare = state->regs[rn] - imm;
-        else
-		compare = state->regs[rn] - valueRmReg;
+	compare = state->regs[rn] - valueRmReg;
+        state->regReads[rn] = state->regReads[rn] + 1;	
 	if(compare == 0)			//EQ
 		state->cpsr = 0b0000;
 	else if (compare > 0)			//GT
 		state->cpsr = 0b1100;
 	else					//LT
 		state->cpsr = 0b1011;
+	state->cpsrWrites = state->cpsrWrites + 1;
     }
+
     state->regs[15] = state->regs[15] + 4;
+    state->regReads[15] = state->regReads[15] + 1;
+    state->regWrites[15] = state->regWrites[15] + 1;
 }
 
 /* Determine if the iw corresponds to Multiply Instruction */
@@ -163,10 +179,16 @@ void execute_mul_iw(struct arm_state *state, unsigned iw)
     if(setBit == 0b1){
 	if(mul < 0){
 		state->cpsr = 0b0100;
+		state->cpsrWrites = state->cpsrWrites + 1;
 	}
     }
+    state->regReads[rm] = state->regReads[rm] + 1;
+    state->regReads[rs] = state->regReads[rs] + 1;
+    state->regWrites[rd] = state->regWrites[rd] + 1;
 
     state->regs[15] = state->regs[15] + 4;
+    state->regReads[15] = state->regReads[15] + 1;
+    state->regWrites[15] = state->regWrites[15] + 1;
 }
 
 /* Determine if iw is a branch and exchange instruction */
@@ -177,11 +199,14 @@ bool is_bx_iw(unsigned iw)
     return (iw == 0b000100101111111111110001);
 }
 
-/* Execute a bx instruction */
+/* Execute a branch and exchange instruction word */
 void execute_bx_iw(struct arm_state *state, unsigned iw)
 {
     iw = iw & 0b1111;
+
     state->regs[15] = state->regs[iw];
+    state->regReads[iw] = state->regReads[iw] + 1;
+    state->regWrites[15] = state->regWrites[15] + 1;
 }
 
 /* Determine if iw is a single data transfer instruction */
@@ -192,7 +217,7 @@ bool is_dt_iw(unsigned iw)
     return (iw == 0b01);
 }
 
-/* Execute a bx instruction */
+/* Execute a Load or Store instruction word */
 void execute_dt_iw(struct arm_state *state, unsigned iw)
 {
     unsigned loadOrStore;
@@ -221,13 +246,15 @@ void execute_dt_iw(struct arm_state *state, unsigned iw)
     imm = iw & 0b111111111111; 
     valueOffset = imm;
 
-    if(immBit == 1) {
+    if(immBit == 1) {			//Offset is a register
         valueOffset = state->regs[rm];
+	state->regReads[rm] = state->regReads[rm] + 1;
         shiftCode = (iw >> 4) & 0b1;
         shiftType = (iw >> 5) & 0b11;
         if(shiftCode == 1) {
                 shiftAmount = (iw >> 8) & 0b1111;
                 shiftAmount = state->regs[shiftAmount];
+		state->regReads[shiftAmount] = state->regReads[shiftAmount] + 1;
         }
         else {
                 shiftAmount = (iw >> 7) & 0b11111;
@@ -243,15 +270,26 @@ void execute_dt_iw(struct arm_state *state, unsigned iw)
     if(postOrPre == 1)
 	state->regs[rn] = state->regs[rn] + valueOffset;
     ptr = (unsigned *) state->regs[rn];
-    if(loadOrStore == 1)
+    state->regReads[rn] = state->regReads[rn] + 1;
+    if(loadOrStore == 1){		//LDR Instruction
 	state->regs[rd] = *ptr;
-    else
-	*ptr = state->regs[rd];       
+	state->regWrites[rd] = state->regWrites[rd] + 1;
+    }
+    else{				//STR Instruction
+	*ptr = state->regs[rd];
+	state->regReads[rd] = state->regReads[rd] + 1;
+    }       
     if(postOrPre == 0)
 	state->regs[rn] = state->regs[rn] + valueOffset;
     if(writeBack == 0)
 	 state->regs[rn] = state->regs[rn] - valueOffset;
+    else{
+	state->regWrites[rn] = state->regWrites[rn] + 1;
+    }
+
     state->regs[15] = state->regs[15] + 4;
+    state->regReads[15] = state->regReads[15] + 1;
+    state->regWrites[15] = state->regWrites[15] + 1;
 }
 
 /* Determine if iw is a branch and link instruction */
@@ -286,23 +324,29 @@ void execute_b_iw(struct arm_state *state, unsigned iw)
 	offset = offset << 2;
 	newOffset = offset;
     }
-    if(link == 0b1){
+    if(link == 0b1){						//BL Instruction
         state->regs[14] = state->regs[15] + 4;
     	state->regs[15] = state->regs[15] + 8 + newOffset;
-    } else if(cond == 0b0001){
-	if(state->cpsr != 0){
+	state->regReads[15] = state->regReads[15] + 1;
+	state->regWrites[14] = state->regWrites[14] + 1;
+    } else if(cond == 0b0001){					//BNE Instruction
+	if(state->cpsr != 0)
 		state->regs[15] = state->regs[15] + 8 + newOffset;
-	}
-	else{
+	else
 		state->regs[15] = state->regs[15] + 4;
-	}
-    } else if (cond == state->cpsr){
+	state->cpsrReads = state->cpsrReads + 1;
+    } else if (cond == state->cpsr){				//B<Cond> Instruction
 	state->regs[15] = state->regs[15] + 8 + newOffset;
-    } else if (cond != 0b1110){
+	state->cpsrReads = state->cpsrReads + 1;
+    } else if (cond != 0b1110){					//B<Cond> Instruction
 	state->regs[15] = state->regs[15] + 4;
-    } else{
+	state->cpsrReads = state->cpsrReads + 1;
+    } else{							//B Instruction
 	state->regs[15] = state->regs[15] + 8 + newOffset;
     }
+    
+    state->regReads[15] = state->regReads[15] + 1;
+    state->regWrites[15] = state->regWrites[15] + 1;
 }
 
 /* Determine the correct iw instruction and execute it */
@@ -314,14 +358,19 @@ void emu_instruction(struct arm_state *state)
     
     if(is_b_iw(iw)) {
 	execute_b_iw(state, iw);
+	state->branchInstr = state->branchInstr + 1;
     } else if (is_dt_iw(iw)) {
         execute_dt_iw(state, iw);
+	state->memoryInstr = state->memoryInstr + 1;
     } else if (is_bx_iw(iw)) {
 	execute_bx_iw(state, iw);
+	state->branchInstr = state->branchInstr + 1;
     } else if(is_mul_iw(iw)) {
 	execute_mul_iw(state, iw);
+	state->computeInstr = state->computeInstr + 1;
     } else if (is_dp_iw(iw)) {
 	execute_dp_iw(state, iw);
+	state->computeInstr = state->computeInstr + 1;
     } else {
 	printf("emu_instruction: unrecognized instruction\n");
 	exit(-1);
@@ -362,7 +411,63 @@ unsigned emu(struct arm_state *state, void *func, int argc, unsigned *args)
     return state->regs[0];
 }
 
+/* Counting the Total Register Usage(Both R/W)  */
+int registersUsage(struct arm_state *state)
+{
+    int i;
+    int count = 0;
+    for(i=0; i<16; i++) {
+	count = count + state->regReads[i] + state->regWrites[i];
+    }
+    count = count + state->cpsrReads + state->cpsrWrites;
 
+    return count;
+}
+
+/* Register Read Analysis */
+void regReadAnalysis(struct arm_state *state, int count, char *str)
+{
+    int i;
+    float perReads;
+    printf("[Register Read Analysis @ %s] ::: \n", str);
+    for(i=0; i<16; i++) {
+	perReads = ((float) state->regReads[i] / count) * 100;
+	printf("r%d has been read %d times (%.2f%) of total register usage counts(%d)\n", i, state->regReads[i], perReads, count);
+   }
+   perReads = ((float) state->cpsrReads / count) * 100;
+   printf("cpsr has been read %d times (%.2f%) of total register usage counts(%d)\n\n", state->cpsrReads, perReads, count);
+}
+
+/* Register Write Analysis */
+void regWriteAnalysis(struct arm_state *state, int count, char *str)
+{
+    int i;
+    float perWrites;
+    printf("[Register Write Analysis @ %s] ::: \n", str);
+    for(i=0; i<16; i++) {
+        perWrites = ((float) state->regWrites[i] / count) * 100;
+        printf("r%d has been written %d times (%.2f%) of total register usage counts(%d)\n", i, state->regWrites[i], perWrites, count);
+   }
+   perWrites = ((float) state->cpsrWrites / count) * 100;
+   printf("cpsr has been written %d times (%.2f%) of total register usage counts(%d)\n\n", state->cpsrWrites, perWrites, count);
+}
+
+/* Instrucctions Analysis */
+void instructionAnalysis(struct arm_state *state, char *str)
+{
+    int totalInstructions = state->memoryInstr + state->computeInstr + state->branchInstr;
+    float perInstructions;
+    printf("[Instructions  Analysis @ %s] ::: \n", str);
+    printf("Number of Instructions executed := %d\n", totalInstructions);
+    perInstructions = ((float) state->memoryInstr / totalInstructions) * 100;
+    printf("Memory Instruction(s) has been called %d times (%.2f%) of total Instruction counts(%d)\n", state->memoryInstr, perInstructions, totalInstructions);
+    perInstructions = ((float) state->computeInstr / totalInstructions) * 100;
+    printf("Compute Instruction(s) has been called %d times (%.2f%) of total Instruction counts(%d)\n", state->computeInstr, perInstructions, totalInstructions);
+    perInstructions = ((float) state->branchInstr / totalInstructions) * 100;
+    printf("Branch Instruction(s) has been called %d times (%.2f%) of total Instruction counts(%d)\n\n", state->branchInstr, perInstructions, totalInstructions);
+}
+
+/* Main */
 int main(int argc, char **argv)
 {
     unsigned rv;
@@ -376,8 +481,10 @@ int main(int argc, char **argv)
     int index = 0;
     int sum = 0;
     unsigned recurSum[4];
+    int totalRegCounts;
 
     /* Recursive Sum: Recursively Compute the numbers of an array */
+    printf("/**************** Result and Dynamic Analysis for \"Recursive Sum\" ***************/\n\n");
     while(true){
         printf("Enter the length of Array: ");
         scanf("%d", &lengthArray);
@@ -404,9 +511,14 @@ int main(int argc, char **argv)
     recurSum[2] = index;
     recurSum[3] = (unsigned )&rsumArray[0];
     rv = emu(&state, (void *) rsum, 4, (unsigned *) recurSum);
-    printf("sum = %d\n", rv);   
+    printf("sum = %d\n\n", rv);
+    totalRegCounts = registersUsage(&state);
+    regReadAnalysis(&state, totalRegCounts, "Recursive Sum");
+    regWriteAnalysis(&state, totalRegCounts, "Recursive Sum");
+    instructionAnalysis(&state, "Recursive Sum");   
     
      /* Factorial Recursive: Input Number and Passing it to emu function for executing ARM instructions */
+    printf("/**************** Result and Dynamic Analysis for \"Factorial Recursive\" ***************/\n\n");
     while(true){
         printf("Enter the number to get the factorial: ");
         scanf("%d", &factNumber);
@@ -416,9 +528,14 @@ int main(int argc, char **argv)
                 break;
     }
     rv = emu(&state, (void *) fact_recursive, 1, &factNumber);
-    printf("fact_recursive(%d) = %d\n", factNumber, rv);
+    printf("fact_recursive(%d) = %d\n\n", factNumber, rv);
+    totalRegCounts = registersUsage(&state);
+    regReadAnalysis(&state, totalRegCounts, "Factorial Recursive Way");
+    regWriteAnalysis(&state, totalRegCounts, "Factorial Recursive Way");
+    instructionAnalysis(&state, "Factorial Recursive Way");
 
     /* Factorial Iterative: Input Number and Passing it to emu function for executing ARM instructions */
+    printf("/**************** Result and Dynamic Analysis for \"Factorial Iterative\" ***************/\n\n");
     while(true){
     	printf("Enter the number to get the factorial: ");
     	scanf("%d", &factNumber);
@@ -428,9 +545,14 @@ int main(int argc, char **argv)
 		break;
     }
     rv = emu(&state, (void *) fact_iterative, 1, &factNumber);
-    printf("fact_iterative(%d) = %d\n", factNumber, rv);   
+    printf("fact_iterative(%d) = %d\n\n", factNumber, rv);
+    totalRegCounts = registersUsage(&state);
+    regReadAnalysis(&state, totalRegCounts, "Factorial Iterative Way");
+    regWriteAnalysis(&state, totalRegCounts, "Factorial Iterative Way");
+    instructionAnalysis(&state, "Factorial Iterative Way");   
     
-    /* InsertionSort: Input Numbers and Passing it to emu function for executing ARM instructions */ 
+    /* InsertionSort: Input Numbers and Passing it to emu function for executing ARM instructions */
+    printf("/**************** Result and Dynamic Analysis for \"Insertion Sort\" ***************/\n\n");
     while(true){
         printf("Enter the length of Array: ");
         scanf("%d", &lengthArray);
@@ -455,11 +577,17 @@ int main(int argc, char **argv)
     insSort[0] = &lengthArray;
     insSort[1] = &insSortArray[0];
     rv = emu(&state, (void *) isort, 2, (unsigned *) insSort);
+    insSortArray = (int *)rv;
     printf("Below is the sorted Array.\n");
     for(i=0; i<lengthArray; i++) {
         printf("%d: %d\n", (i+1), insSortArray[i]);
     }
-  
+    printf("\n");
+    totalRegCounts = registersUsage(&state);
+    regReadAnalysis(&state, totalRegCounts, "Insertion Sort");
+    regWriteAnalysis(&state, totalRegCounts, "Insertion Sort");
+    instructionAnalysis(&state, "Insertion Sort"); 
+    
     return 0;
 }
 

@@ -33,4 +33,5 @@ ExitInnerLoop:
 	add r4,r4,#1
 	b OuterLoop
 ExitOuterLoop:
+	mov r0,r8
 	bx lr
