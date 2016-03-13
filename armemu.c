@@ -432,12 +432,14 @@ void regReadAnalysis(struct arm_state *state, int count, char *str)
     int i;
     float perReads;
     printf("[Register Read Analysis @ %s] ::: \n", str);
+    printf("  Register	   	ReadCount	 	   Read%\n");
+    printf("  --------	   	---------	           -----\n");
     for(i=0; i<16; i++) {
 	perReads = ((float) state->regReads[i] / count) * 100;
-	printf("r%d has been read %d times (%.2f%) of total register usage counts(%d)\n", i, state->regReads[i], perReads, count);
+	printf("     r%d %20d times %20.2f\%\n", i, state->regReads[i], perReads);
    }
    perReads = ((float) state->cpsrReads / count) * 100;
-   printf("cpsr has been read %d times (%.2f%) of total register usage counts(%d)\n\n", state->cpsrReads, perReads, count);
+   printf("     cpsr%20d times %20.2f\%\n\n", state->cpsrReads, perReads);
 }
 
 /* Register Write Analysis */
@@ -446,27 +448,32 @@ void regWriteAnalysis(struct arm_state *state, int count, char *str)
     int i;
     float perWrites;
     printf("[Register Write Analysis @ %s] ::: \n", str);
+    printf("  Register              WriteCount                 Write%\n");
+    printf("  --------              ----------                 ------\n");
     for(i=0; i<16; i++) {
         perWrites = ((float) state->regWrites[i] / count) * 100;
-        printf("r%d has been written %d times (%.2f%) of total register usage counts(%d)\n", i, state->regWrites[i], perWrites, count);
+        printf("     r%d %20d times %20.2f\%\n", i, state->regWrites[i], perWrites);
    }
    perWrites = ((float) state->cpsrWrites / count) * 100;
-   printf("cpsr has been written %d times (%.2f%) of total register usage counts(%d)\n\n", state->cpsrWrites, perWrites, count);
+   printf("     cpsr%20d times %20.2f\%\n\n", state->cpsrWrites, perWrites);
+   printf("NOTE: Register Read/Write(%) has been calculated based on total register usage counts(Reads+Writes) := %d\n\n", count);
 }
 
-/* Instrucctions Analysis */
+/* Instructions Analysis */
 void instructionAnalysis(struct arm_state *state, char *str)
 {
     int totalInstructions = state->memoryInstr + state->computeInstr + state->branchInstr;
     float perInstructions;
     printf("[Instructions  Analysis @ %s] ::: \n", str);
-    printf("Number of Instructions executed := %d\n", totalInstructions);
+    printf("  Instructions             	    Count                 Executed%\n");
+    printf("  ------------                     -------                ---------\n");
     perInstructions = ((float) state->memoryInstr / totalInstructions) * 100;
-    printf("Memory Instruction(s) has been called %d times (%.2f%) of total Instruction counts(%d)\n", state->memoryInstr, perInstructions, totalInstructions);
+    printf("  %-15s %20d times %20.2f\%\n", "Memory", state->memoryInstr, perInstructions);
     perInstructions = ((float) state->computeInstr / totalInstructions) * 100;
-    printf("Compute Instruction(s) has been called %d times (%.2f%) of total Instruction counts(%d)\n", state->computeInstr, perInstructions, totalInstructions);
+    printf("  %-15s %20d times %20.2f\%\n", "Computation", state->computeInstr, perInstructions);
     perInstructions = ((float) state->branchInstr / totalInstructions) * 100;
-    printf("Branch Instruction(s) has been called %d times (%.2f%) of total Instruction counts(%d)\n\n", state->branchInstr, perInstructions, totalInstructions);
+    printf("  %-15s %20d times %20.2f\%\n\n", "Branching", state->branchInstr, perInstructions);
+    printf("NOTE: Instructions Execution(%) has been calculated based on total instructions executed := %d\n\n", totalInstructions);
 }
 
 /* Main */
@@ -527,7 +534,6 @@ int main(int argc, char **argv)
     instructionAnalysis(&state, "Recursive Sum");
     printf("[Performance Analysis @ %s] :::\n", "Recursive Sum");
     printf("<-------------- ARM Emulator -------------->\n");
-    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
     printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
     ct1 = clock();
     rv = rsum(recurSum[0], recurSum[1], recurSum[2], recurSum[3]);
@@ -558,7 +564,6 @@ int main(int argc, char **argv)
     instructionAnalysis(&state, "Factorial Recursive Way");
     printf("[Performance Analysis @ %s] :::\n", "Factorial Recursive Way");
     printf("<------------------ ARM Emulator ------------------>\n");
-    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
     printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
     ct1 = clock();
     rv = fact_recursive(factNumber);
@@ -589,7 +594,6 @@ int main(int argc, char **argv)
     instructionAnalysis(&state, "Factorial Iterative Way");   
     printf("[Performance Analysis @ %s] :::\n", "Factorial Iterative Way");
     printf("<------------------ ARM Emulator ------------------>\n");
-    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
     printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
     ct1 = clock();
     rv = fact_iterative(factNumber);
@@ -641,7 +645,6 @@ int main(int argc, char **argv)
     instructionAnalysis(&state, "Insertion Sort"); 
     printf("[Performance Analysis @ %s] :::\n", "Insertion Sort");
     printf("<-------------- ARM Emulator -------------->\n");
-    printf ("CLOCK_TICKS_PER_SEC = %ld\n", CLOCKS_PER_SEC);
     printf ("CPU TimeUtilization = %f seconds\n\n", ((double)(ct2 - ct1))/ CLOCKS_PER_SEC);
     ct1 = clock();
     rv = isort(insSort[0], insSort[1]);
