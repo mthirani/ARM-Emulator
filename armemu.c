@@ -432,14 +432,14 @@ void regReadAnalysis(struct arm_state *state, int count, char *str)
     int i;
     float perReads;
     printf("[Register Read Analysis @ %s] ::: \n", str);
-    printf("  Register	   	ReadCount	 	   Read%\n");
-    printf("  --------	   	---------	           -----\n");
+    printf("  Register	   	ReadCount	 	   Read %\n");
+    printf("  --------	   	---------	           ------\n");
     for(i=0; i<16; i++) {
 	perReads = ((float) state->regReads[i] / count) * 100;
-	printf("     r%d %20d times %20.2f\%\n", i, state->regReads[i], perReads);
+	printf("     r%d %20d times %20.2f%\n", i, state->regReads[i], perReads);
    }
    perReads = ((float) state->cpsrReads / count) * 100;
-   printf("     cpsr%20d times %20.2f\%\n\n", state->cpsrReads, perReads);
+   printf("     cpsr%20d times %20.2f%\n\n", state->cpsrReads, perReads);
 }
 
 /* Register Write Analysis */
@@ -448,14 +448,14 @@ void regWriteAnalysis(struct arm_state *state, int count, char *str)
     int i;
     float perWrites;
     printf("[Register Write Analysis @ %s] ::: \n", str);
-    printf("  Register              WriteCount                 Write%\n");
-    printf("  --------              ----------                 ------\n");
+    printf("  Register              WriteCount                 Write %\n");
+    printf("  --------              ----------                 -------\n");
     for(i=0; i<16; i++) {
         perWrites = ((float) state->regWrites[i] / count) * 100;
-        printf("     r%d %20d times %20.2f\%\n", i, state->regWrites[i], perWrites);
+        printf("     r%d %20d times %20.2f%\n", i, state->regWrites[i], perWrites);
    }
    perWrites = ((float) state->cpsrWrites / count) * 100;
-   printf("     cpsr%20d times %20.2f\%\n\n", state->cpsrWrites, perWrites);
+   printf("     cpsr%20d times %20.2f%\n\n", state->cpsrWrites, perWrites);
    printf("NOTE: Register Read/Write(%) has been calculated based on total register usage counts(Reads+Writes) := %d\n\n", count);
 }
 
@@ -465,14 +465,14 @@ void instructionAnalysis(struct arm_state *state, char *str)
     int totalInstructions = state->memoryInstr + state->computeInstr + state->branchInstr;
     float perInstructions;
     printf("[Instructions  Analysis @ %s] ::: \n", str);
-    printf("  Instructions             	    Count                 Executed%\n");
-    printf("  ------------                     -------                ---------\n");
+    printf("  Instructions             	    Count                 Executed %\n");
+    printf("  ------------                     -------                ----------\n");
     perInstructions = ((float) state->memoryInstr / totalInstructions) * 100;
-    printf("  %-15s %20d times %20.2f\%\n", "Memory", state->memoryInstr, perInstructions);
+    printf("  %-15s %20d times %20.2f%\n", "Memory", state->memoryInstr, perInstructions);
     perInstructions = ((float) state->computeInstr / totalInstructions) * 100;
-    printf("  %-15s %20d times %20.2f\%\n", "Computation", state->computeInstr, perInstructions);
+    printf("  %-15s %20d times %20.2f%\n", "Computation", state->computeInstr, perInstructions);
     perInstructions = ((float) state->branchInstr / totalInstructions) * 100;
-    printf("  %-15s %20d times %20.2f\%\n\n", "Branching", state->branchInstr, perInstructions);
+    printf("  %-15s %20d times %20.2f%\n\n", "Branching", state->branchInstr, perInstructions);
     printf("NOTE: Instructions Execution(%) has been calculated based on total instructions executed := %d\n\n", totalInstructions);
 }
 
